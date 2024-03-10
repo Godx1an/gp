@@ -1,14 +1,17 @@
 package main
 
 import (
-	"github.com/gin-gonic/gin"
-	"net/http"
+	"fmt"
+	"graduation_project/internal/routers"
 )
 
+const APIPort = 8080
+
 func main() {
-	router := gin.Default()
-	router.GET("/", func(c *gin.Context) {
-		c.String(http.StatusOK, "Hello World")
-	})
-	router.Run(":8000")
+	r := routers.SetupRouter()
+	//pprof.Register(r)
+	if err := r.Run(fmt.Sprintf(":%d", APIPort)); err != nil {
+		panic(fmt.Sprintf("run server failed, err:%v\n", err))
+	}
+
 }

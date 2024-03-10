@@ -3,14 +3,14 @@ package db_utils
 import (
 	"context"
 	"fmt"
+	"github.com/Godx1an/gp_ent/pkg/ent_work"
 	"github.com/sirupsen/logrus"
-	"github.com/stark-sim/cephalon-ent/pkg/cep_ent"
-	"vpay/internal/db"
+	"graduation_project/internal/db"
 )
 
 // WithTx wrap transaction according to doc of Ent
 // https://entgo.io/docs/transactions/
-func WithTx(ctx context.Context, tx *cep_ent.Tx, fn func(tx *cep_ent.Tx) error) error {
+func WithTx(ctx context.Context, tx *ent_work.Tx, fn func(tx *ent_work.Tx) error) error {
 	var err error
 	if tx == nil {
 		tx, err = db.DB.Tx(ctx)
@@ -50,7 +50,7 @@ func WithTx(ctx context.Context, tx *cep_ent.Tx, fn func(tx *cep_ent.Tx) error) 
 }
 
 // WithClient 无事务执行，写成 With 格式而不是 GetClient 是为了方便切换成事务格式时代码结构相似
-func WithClient(tx *cep_ent.Tx, fn func(client *cep_ent.Client) error) error {
+func WithClient(tx *ent_work.Tx, fn func(client *ent_work.Client) error) error {
 	if tx == nil {
 		// 如果传入事务为空，那么使用全局的 DB Client 作为 client 使用
 		err := fn(db.DB)
