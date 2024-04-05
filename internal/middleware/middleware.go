@@ -1,6 +1,7 @@
 package middleware
 
 import (
+	"github.com/Godx1an/gp_ent/pkg/ent_work/admin"
 	"github.com/Godx1an/gp_ent/pkg/ent_work/user"
 	"github.com/gin-gonic/gin"
 	"github.com/sirupsen/logrus"
@@ -24,7 +25,7 @@ func TokenVer() gin.HandlerFunc {
 		if token := c.GetHeader("Authorization"); token != "" {
 			userID, err, _ = TokenToUserID(token)
 			if err != nil {
-				response.RespError(c, code.AuthFailed)
+				response.RespError(c, code.UnLogin)
 				c.Abort()
 				return
 			}
@@ -35,7 +36,7 @@ func TokenVer() gin.HandlerFunc {
 				c.Abort()
 				return
 			}
-		} else if token, err = c.Cookie("token"); err != nil && token != "" {
+		} else if token, err = c.Cookie("token"); err == nil && token != "" {
 			userID, err, _ = TokenToUserID(token)
 			if err != nil {
 				response.RespError(c, code.AuthFailed)
@@ -77,4 +78,47 @@ func TokenToUserID(token string) (userID int64, err error, errMsg string) {
 		return 0, code_msgs.Fail, "string 转 int64 失败"
 	}
 	return userID, nil, ""
+}
+
+func TokenVerAdmin() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		var err error
+		var userID int64
+		if token := c.GetHeader("Authorization"); token != "" {
+			userID, err, _ = TokenToUserID(token)
+			if err != nil {
+				response.RespError(c, code.AuthFailed)
+				c.Abort()
+				return
+			}
+			_, err = db.DB.Admin.Query().Where(admin.ID(userID)).First(c)
+			if err != nil {
+				response.RespError(c, code.AuthFailed)
+				logrus.Error("数据库查询失败")
+				c.Abort()
+				return
+			}
+		} else if token, err = c.Cookie("token"); err == nil && token != "" {
+			userID, err, _ = TokenToUserID(token)
+			if err != nil {
+				response.RespError(c, code.AuthFailed)
+				c.Abort()
+				return
+			}
+			_, err = db.DB.Admin.Query().Where(admin.ID(userID)).First(c)
+			if err != nil {
+				response.RespError(c, code.AuthFailed)
+				logrus.Error("数据库查询失败")
+				c.Abort()
+				return
+			}
+		} else {
+			response.RespError(c, code.AuthFailed)
+			c.Abort()
+			return
+		}
+		c.Set(UserID, userID)
+		c.Next()
+		return
+	}
 }
