@@ -19,6 +19,10 @@ import (
 	"time"
 )
 
+type paginate struct {
+	PageIndex int `json:"pageIndex"`
+}
+
 // ModifyAdminNickname 更改管理员昵称
 func ModifyAdminNickname(c *gin.Context) {
 	var (
@@ -155,9 +159,9 @@ func BindSchool(c *gin.Context) {
 // AddSchool 添加未存在的学校
 func AddSchool(c *gin.Context) {
 	var (
-		acc    account
-		_admin *ent_work.Admin
-		err    error
+		acc     account
+		err     error
+		_school *ent_work.School
 	)
 	err = c.ShouldBind(&acc)
 	if err != nil {
@@ -174,37 +178,60 @@ func AddSchool(c *gin.Context) {
 	}
 
 	if err = db_utils.WithTx(c, nil, func(tx *ent_work.Tx) error {
-		_admin, err = tx.Admin.Query().Where(admin.ID(UID), admin.DeletedAt(utils.ZeroTime)).First(c)
-		if err != nil {
-			response.RespErrorWithMsg(c, code.AuthFailed, "权限验证失败")
-			return err
-		}
-		if _admin.School != "" {
-			response.RespErrorWithMsg(c, code.FailHasRegister, "该用户已绑定过学校")
-			return errors.New("该用户已绑定过学校")
-		}
 		_, err = tx.School.Query().Where(school.Name(acc.School), school.DeletedAt(utils.ZeroTime)).First(c)
 		if err == nil {
 			response.RespErrorWithMsg(c, code.InvalidParams, "该学校已存在")
 			return errors.New("该学校已存在")
 		}
-		create := tx.School.Create().SetName(acc.School).SetCreatedBy(UID)
-		_, err = create.Save(c)
+		_school, err = tx.School.Query().Where(school.Name(acc.School)).First(c)
+		if err != nil {
+			create := tx.School.Create().SetName(acc.School).SetCreatedBy(UID)
+			_school, err = create.Save(c)
+		} else {
+			_school, err = tx.School.UpdateOne(_school).SetDeletedAt(utils.ZeroTime).Save(c)
+		}
 		if err != nil {
 			response.RespError(c, code.ServerErrDB)
 			return err
 		}
-		_, err = tx.Admin.UpdateOne(_admin).SetSchool(acc.School).Save(c)
-		if err != nil {
-			response.RespError(c, code.ServerErrDB)
-			return err
-		}
-
+		response.RespSuccess(c, "添加成功")
 		return nil
 	}); err != nil {
 		return
 	}
 
+	return
+}
+
+func DeleteSchool(c *gin.Context) {
+	var (
+		acc     account
+		err     error
+		_school *ent_work.School
+	)
+	err = c.ShouldBind(&acc)
+	if err != nil {
+		logrus.Errorf("Login bind with params err: %v", err)
+		response.RespErrorInvalidParams(c, err)
+		return
+	}
+
+	if err = db_utils.WithTx(c, nil, func(tx *ent_work.Tx) error {
+		_school, err = tx.School.Query().Where(school.Name(acc.School), school.DeletedAt(utils.ZeroTime)).First(c)
+		if err != nil {
+			response.RespErrorWithMsg(c, code.ServerErrDB, "数据库异常")
+			return errors.New("数据库异常")
+		}
+		_, err = tx.School.UpdateOne(_school).SetDeletedAt(time.Now()).Save(c)
+		if err != nil {
+			response.RespErrorWithMsg(c, code.ServerErrDB, "删除失败")
+			return errors.New("删除失败")
+		}
+		response.RespSuccess(c, "删除成功")
+		return nil
+	}); err != nil {
+		return
+	}
 	return
 }
 
@@ -234,8 +261,6 @@ func AddSchoolItem(c *gin.Context) {
 	}
 	avg, err := strconv.Atoi(item.Avg)
 	maxp, err := strconv.Atoi(item.MaxParticipants)
-	print(avg)
-	print(maxp)
 	if err = db_utils.WithTx(c, nil, func(tx *ent_work.Tx) error {
 		_admin, err = tx.Admin.Query().Where(admin.ID(UID), admin.DeletedAt(utils.ZeroTime)).First(c)
 		if err != nil {
@@ -248,6 +273,10 @@ func AddSchoolItem(c *gin.Context) {
 			return err
 		}
 		_school, err = tx.School.Query().Where(school.Name(_admin.School), school.DeletedAt(utils.ZeroTime)).First(c)
+		if err != nil {
+			response.RespErrorWithMsg(c, code.SourceExist, "请先添加学校")
+			return errors.New("请先添加学校")
+		}
 		_, err = tx.SchoolFitnessTestItem.Query().Where(schoolfitnesstestitem.School(_admin.School), schoolfitnesstestitem.Item(item.Item), schoolfitnesstestitem.DeletedAt(utils.ZeroTime)).First(c)
 		if err == nil {
 			response.RespErrorWithMsg(c, code.SourceExist, "本校已有该项目")
@@ -372,6 +401,35 @@ func QuerySchoolItem(c *gin.Context) {
 	return
 }
 
+// SuperQueryItem 查询所有项目
+func SuperQueryItem(c *gin.Context) {
+	var (
+		item ItemReq
+		err  error
+	)
+
+	err = c.ShouldBind(&item)
+	if err != nil {
+		logrus.Errorf("Login bind with params err: %v", err)
+		response.RespErrorInvalidParams(c, err)
+		return
+	}
+
+	if err = db_utils.WithTx(c, nil, func(tx *ent_work.Tx) error {
+		sftis, err := tx.FitnessTestItem.Query().Where(fitnesstestitem.DeletedAt(utils.ZeroTime)).All(c)
+		if err != nil {
+			response.RespErrorWithMsg(c, code.ServerErrDB, "无法查询到数据")
+			return errors.New("无法查询到数据")
+		}
+		response.RespSuccessWithMsg(c, sftis, "查询成功")
+		return nil
+	}); err != nil {
+		return
+	}
+
+	return
+}
+
 // DeleteSchoolItem 删除本校的项目
 func DeleteSchoolItem(c *gin.Context) {
 	var (
@@ -405,7 +463,7 @@ func DeleteSchoolItem(c *gin.Context) {
 			response.RespErrorWithMsg(c, code.ServerErrDB, "删除失败")
 			return errors.New("删除失败")
 		}
-		response.RespSuccess(c, "")
+		response.RespSuccess(c, "删除成功")
 		return nil
 	}); err != nil {
 		return
@@ -414,12 +472,12 @@ func DeleteSchoolItem(c *gin.Context) {
 	return
 }
 
-// QueryUSer 查询本校用户
 func QueryUser(c *gin.Context) {
 	var (
 		_admin *ent_work.Admin
 		err    error
 		users  []*ent_work.User
+		page   paginate
 	)
 	userID, _ := c.Get("user_id")
 	UID, ok := userID.(int64)
@@ -427,22 +485,95 @@ func QueryUser(c *gin.Context) {
 		response.RespErrorInvalidParams(c, code.ServerErr)
 		return
 	}
+	err = c.ShouldBind(&page)
+	if err != nil {
+		return
+	}
+	// 解析 pageIndex
+	pageIndex := page.PageIndex
+	pageSize := 20
 	if err = db_utils.WithTx(c, nil, func(tx *ent_work.Tx) error {
 		_admin, err = tx.Admin.Query().Where(admin.ID(UID)).First(c)
 		if err != nil {
 			response.RespError(c, code.ServerErrDB)
 			return errors.New("数据库异常")
 		}
-		users, err = tx.User.Query().Where(user.School(_admin.School), user.DeletedAt(utils.ZeroTime)).All(c)
+		// 分页查询用户数据
+		offset := (pageIndex - 1) * pageSize
+		users, err = tx.User.Query().
+			Where(user.School(_admin.School), user.DeletedAt(utils.ZeroTime)).
+			Limit(pageSize).
+			Offset(offset).
+			All(c)
 		if err != nil {
 			response.RespErrorWithMsg(c, code.ServerErrDB, "查询失败")
 			return errors.New("查询失败")
 		}
-		response.RespSuccess(c, users)
+
+		// 查询总数据量
+		total, err := tx.User.Query().
+			Where(user.School(_admin.School), user.DeletedAt(utils.ZeroTime)).
+			Count(c)
+		if err != nil {
+			response.RespErrorWithMsg(c, code.ServerErrDB, "查询失败")
+			return errors.New("查询失败")
+		}
+		// 使用 RespSuccessPagination 返回分页数据
+		response.RespSuccessPagination(c, pageIndex, pageSize, int64(total), users)
 		return nil
 	}); err != nil {
 		return
 	}
-
 	return
 }
+
+// QuerySchool 查询所有学校
+func QuerySchool(c *gin.Context) {
+	var (
+		err     error
+		_school []*ent_work.School
+	)
+	if err = db_utils.WithTx(c, nil, func(tx *ent_work.Tx) error {
+		_school, err = tx.School.Query().Where(school.DeletedAt(utils.ZeroTime)).All(c)
+		response.RespSuccessWithMsg(c, _school, "查询成功")
+		return nil
+	}); err != nil {
+		return
+	}
+	return
+}
+
+// QueryUser 查询本校用户
+//func QueryUser(c *gin.Context) {
+//
+//	var (
+//		_admin *ent_work.Admin
+//		err    error
+//		users  []*ent_work.User
+//	)
+//	userID, _ := c.Get("user_id")
+//	UID, ok := userID.(int64)
+//	if !ok {
+//		response.RespErrorInvalidParams(c, code.ServerErr)
+//		return
+//	}
+//	if err = db_utils.WithTx(c, nil, func(tx *ent_work.Tx) error {
+//		_admin, err = tx.Admin.Query().Where(admin.ID(UID)).First(c)
+//		if err != nil {
+//			response.RespError(c, code.ServerErrDB)
+//			return errors.New("数据库异常")
+//		}
+//		users, err = tx.User.Query().Where(user.School(_admin.School), user.DeletedAt(utils.ZeroTime)).All(c)
+//		if err != nil {
+//			response.RespErrorWithMsg(c, code.ServerErrDB, "查询失败")
+//			return errors.New("查询失败")
+//		}
+//		response.RespSuccess(c, users)
+//		return nil
+//	}); err != nil {
+//		return
+//	}
+//
+//	return
+//
+//}
