@@ -22,7 +22,8 @@ func TokenVer() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		var err error
 		var userID int64
-		if token := c.GetHeader("Authorization"); token != "" {
+		var token string
+		if token = c.GetHeader("Authorization"); token != "" {
 			userID, err, _ = TokenToUserID(token)
 			if err != nil {
 				response.RespError(c, code.UnLogin)

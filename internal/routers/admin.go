@@ -24,8 +24,10 @@ func AdminRouters(r *gin.RouterGroup) {
 	auth.POST("/delete_school_item", controllers.DeleteSchoolItem)
 	auth.POST("/modify_school_item", controllers.ModifySchoolItem)
 	auth.POST("/query_user", controllers.QueryUser)
-	auth.POST("/super_query_item", controllers.SuperQueryItem)
 	auth.POST("/modify_item", controllers.ModifyItem)
+	auth.POST("/super_query_item", controllers.SuperQueryItem)
 	auth.POST("/query_school", controllers.QuerySchool)
 	auth.POST("/delete_school", controllers.DeleteSchool)
+	auth.POST("/admin_query_queue", controllers.AdminQueryQueue)
+	auth.POST("/handle_queue", controllers.HandleQueue)
 }

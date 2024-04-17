@@ -2,6 +2,7 @@ package controllers
 
 import (
 	"errors"
+	"fmt"
 	"github.com/Godx1an/gp_ent/pkg/ent_work"
 	"github.com/Godx1an/gp_ent/pkg/ent_work/admin"
 	"github.com/Godx1an/gp_ent/pkg/ent_work/fitnesstestitem"
@@ -13,6 +14,8 @@ import (
 	"github.com/stark-sim/serializer/code"
 	"github.com/stark-sim/serializer/response"
 	"graduation_project/internal/handlers"
+	"graduation_project/internal/myredis"
+	"graduation_project/internal/types"
 	"graduation_project/utils"
 	"graduation_project/utils/db_utils"
 	"strconv"
@@ -543,37 +546,47 @@ func QuerySchool(c *gin.Context) {
 	return
 }
 
-// QueryUser 查询本校用户
-//func QueryUser(c *gin.Context) {
-//
-//	var (
-//		_admin *ent_work.Admin
-//		err    error
-//		users  []*ent_work.User
-//	)
-//	userID, _ := c.Get("user_id")
-//	UID, ok := userID.(int64)
-//	if !ok {
-//		response.RespErrorInvalidParams(c, code.ServerErr)
-//		return
-//	}
-//	if err = db_utils.WithTx(c, nil, func(tx *ent_work.Tx) error {
-//		_admin, err = tx.Admin.Query().Where(admin.ID(UID)).First(c)
-//		if err != nil {
-//			response.RespError(c, code.ServerErrDB)
-//			return errors.New("数据库异常")
-//		}
-//		users, err = tx.User.Query().Where(user.School(_admin.School), user.DeletedAt(utils.ZeroTime)).All(c)
-//		if err != nil {
-//			response.RespErrorWithMsg(c, code.ServerErrDB, "查询失败")
-//			return errors.New("查询失败")
-//		}
-//		response.RespSuccess(c, users)
-//		return nil
-//	}); err != nil {
-//		return
-//	}
-//
-//	return
-//
-//}
+func AdminQueryQueue(c *gin.Context) {
+	var (
+		req ItemReq
+		err error
+	)
+	err = c.ShouldBind(&req)
+	if err != nil {
+		response.RespErrorInvalidParams(c, err)
+		return
+	}
+	rKey := fmt.Sprintf(types.RedisItem, req.Id)
+	result, err := myredis.Client.LRange(c, rKey, 0, -1).Result()
+	if err != nil {
+		response.RespErrorWithMsg(c, code.ServerErrCache, "缓存错误")
+		return
+	}
+	if len(result) == 0 {
+		response.RespErrorWithMsg(c, code.NotFound, "队列为空")
+		return
+	}
+	//定义一个返回的user数组
+	var users []*ent_work.User
+	//根据result中的id数据来查询用户信息
+	if err = db_utils.WithTx(c, nil, func(tx *ent_work.Tx) error {
+		for i := 0; i < len(result); i++ {
+			id, err := strconv.ParseInt(result[i], 10, 64)
+			if err != nil {
+				response.RespErrorWithMsg(c, code.ServerErrDB, "查询失败")
+				return err
+			}
+			user, err := tx.User.Query().Where(user.ID(id), user.DeletedAt(utils.ZeroTime)).First(c)
+			if err != nil {
+				response.RespErrorWithMsg(c, code.ServerErrDB, "查询失败")
+				return err
+			}
+			users = append(users, user)
+		}
+		return nil
+	}); err != nil {
+		return
+	} // 封装查询结果到 Queue 结构体
+	response.RespSuccessWithMsg(c, users, "查询成功")
+	return
+}

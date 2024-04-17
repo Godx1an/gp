@@ -13,5 +13,4 @@ func main() {
 		panic(fmt.Sprintf("run server failed, err:%v\n", err))
 	}
 	//pprof.Register(r)
-
 }
