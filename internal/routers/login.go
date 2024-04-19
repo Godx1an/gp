@@ -6,9 +6,9 @@ import (
 )
 
 func UserLoginRouters(r *gin.RouterGroup) {
-
 	r.POST("/user_login", controllers.UserLogin)
-
+	r.POST("/send_code", controllers.SendCode)
+	r.POST("/reset_password", controllers.ResetPassword)
 }
 
 func AdminLoginRouters(r *gin.RouterGroup) {

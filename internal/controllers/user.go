@@ -241,39 +241,6 @@ func QueryItem(c *gin.Context) {
 	return
 }
 
-func QueryItemTime(c *gin.Context) {
-	var (
-		_user *ent_work.User
-		err   error
-	)
-	userID, _ := c.Get("user_id")
-	UID, ok := userID.(int64)
-	if !ok {
-		response.RespErrorInvalidParams(c, code.ServerErr)
-		return
-	}
-	if err = db_utils.WithTx(c, nil, func(tx *ent_work.Tx) error {
-		_user, err = tx.User.Query().Where(user.ID(UID)).First(c)
-		if err != nil {
-			response.RespErrorWithMsg(c, code.ServerErrDB, "无法查询到数据")
-			return errors.New("无法查询到数据")
-		}
-		sftis, err := tx.SchoolFitnessTestItem.Query().Where(schoolfitnesstestitem.DeletedAt(utils.ZeroTime)).Where(schoolfitnesstestitem.School(_user.School)).All(c)
-		if err != nil {
-			response.RespErrorWithMsg(c, code.ServerErrDB, "无法查询到数据")
-			return errors.New("无法查询到数据")
-		}
-		lists, err := GetListsCount(c, sftis)
-		if err != nil {
-			return err
-		}
-		response.RespSuccess(c, lists)
-		return nil
-	}); err != nil {
-		return
-	}
-}
-
 func GetListsCount(c *gin.Context, sftis []*ent_work.SchoolFitnessTestItem) ([]int64, error) {
 	var listsCount []int64
 
@@ -424,5 +391,36 @@ func Dequeue(c *gin.Context) {
 		return
 	}
 	response.RespSuccessWithMsg(c, nil, "取消成功")
+	return
+}
+
+// QueryReservation 查询预约项目
+func QueryReservation(c *gin.Context) {
+	var (
+		err error
+	)
+	userID, _ := c.Get("user_id")
+	UID, ok := userID.(int64)
+	if !ok {
+		response.RespErrorInvalidParams(c, code.ServerErr)
+		return
+	}
+	if err = db_utils.WithTx(c, nil, func(tx *ent_work.Tx) error {
+		_user, err := tx.User.Query().Where(user.ID(UID)).First(c)
+		if err != nil {
+			response.RespErrorWithMsg(c, code.ServerErrDB, "无法查询到数据")
+			return errors.New("无法查询到数据")
+		}
+		sftis, err := tx.SchoolFitnessTestItem.Query().Where(schoolfitnesstestitem.School(_user.School), schoolfitnesstestitem.DeletedAt(utils.ZeroTime)).All(c)
+		item, err := queryEveryItem(c, _user, sftis)
+		if err != nil {
+			return err
+		}
+		response.RespSuccessWithMsg(c, item, "查询成功")
+		return nil
+	}); err != nil {
+		return
+	}
+
 	return
 }

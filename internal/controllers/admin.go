@@ -590,3 +590,53 @@ func AdminQueryQueue(c *gin.Context) {
 	response.RespSuccessWithMsg(c, users, "查询成功")
 	return
 }
+
+func ModifyItem(c *gin.Context) {
+	var (
+		req    ItemReq
+		_admin *ent_work.Admin
+		_item  *ent_work.FitnessTestItem
+		err    error
+	)
+
+	err = c.ShouldBind(&req)
+	if err != nil {
+		logrus.Errorf("Login bind with params err: %v", err)
+		response.RespErrorInvalidParams(c, err)
+		return
+	}
+
+	userID, _ := c.Get("user_id")
+	UID, ok := userID.(int64)
+	if !ok {
+		response.RespErrorInvalidParams(c, code.ServerErr)
+		return
+	}
+
+	if err = db_utils.WithTx(c, nil, func(tx *ent_work.Tx) error {
+		_admin, err = tx.Admin.Query().Where(admin.ID(UID)).First(c)
+		if err != nil {
+			response.RespErrorWithMsg(c, code.AuthFailed, "权限验证失败")
+			return err
+		}
+		if _admin.ID != 1769198633205878784 {
+			response.RespErrorWithMsg(c, code.AuthFailed, "权限验证失败")
+			return errors.New("权限校验失败")
+		}
+		_item, err = tx.FitnessTestItem.Query().Where(fitnesstestitem.Item(req.Origin)).First(c)
+		if err != nil {
+			response.RespErrorWithMsg(c, code.ServerErrDB, "找不到该项目")
+			return errors.New("找不到该项目")
+		}
+		_, err = tx.FitnessTestItem.UpdateOne(_item).SetItem(req.Item).Save(c)
+		if err != nil {
+			response.RespErrorWithMsg(c, code.NotFound, "修改失败")
+			return err
+		}
+		response.RespSuccess(c, "")
+		return nil
+	}); err != nil {
+		return
+	}
+	return
+}

@@ -4,3 +4,6 @@ db:
   username: 'postgres'
   password: 'zhangsansb'
   database: 'gp'
+email:
+  username: 1318059359@qq.com
+  password: uqdghgywlarjiihb

@@ -85,7 +85,6 @@ func UserLogin(c *gin.Context) {
 		Expires: time.Now().Add(jwt.TokenExpireDurationAutoLogin),
 	}
 	// 塞入 cookie
-	logrus.Info("正在塞入cookie")
 	http.SetCookie(c.Writer, &cookie)
 	resData.(map[string]interface{})["token"] = generatedJwt
 	response.RespSuccess(c, resData)
@@ -161,5 +160,39 @@ func AdminLogin(c *gin.Context) {
 	if err != nil {
 		logrus.Error(err)
 	}
+	return
+}
+
+func ResetPassword(c *gin.Context) {
+	var (
+		scq   SendCodeReq
+		_user *ent_work.User
+	)
+	err := c.ShouldBind(&scq)
+	if err != nil {
+		logrus.Errorf("modify bind with params err: %v", err)
+		response.RespErrorInvalidParams(c, err)
+		return
+	}
+	if !VerifyCode(c, scq.Email, scq.Code) {
+		response.RespErrorWithMsg(c, code.ServerErr, "验证码错误")
+		return
+	}
+	if err = db_utils.WithTx(c, nil, func(tx *ent_work.Tx) error {
+		_user, err = tx.User.Query().Where(user.Email(scq.Email)).First(c)
+		if err != nil {
+			response.RespErrorWithMsg(c, code.ServerErrDB, "无法查询到数据")
+			return errors.New("无法查询到数据")
+		}
+		//更新_user中的密码为pwd
+		_, err = tx.User.UpdateOne(_user).SetPassword(scq.Pwd).Save(c)
+		if err != nil {
+			response.RespErrorWithMsg(c, code.ServerErrDB, "重设失败")
+		}
+		return nil
+	}); err != nil {
+		return
+	}
+	response.RespSuccessWithMsg(c, code.Success, "重设成功")
 	return
 }

@@ -4,7 +4,9 @@ go 1.21
 
 require (
 	entgo.io/ent v0.13.1
+	github.com/Godx1an/gp_ent v1.0.0
 	github.com/antonfisher/nested-logrus-formatter v1.3.1
+	github.com/badoux/checkmail v1.2.4
 	github.com/bwmarrin/snowflake v0.3.0
 	github.com/chenyahui/gin-cache v1.9.0
 	github.com/dgrijalva/jwt-go v3.2.0+incompatible
@@ -18,16 +20,15 @@ require (
 	github.com/lestrrat-go/file-rotatelogs v2.4.0+incompatible
 	github.com/lib/pq v1.10.9
 	github.com/rifflock/lfshook v0.0.0-20180920164130-b9218ef580f5
-	github.com/robfig/cron/v3 v3.0.1
 	github.com/sirupsen/logrus v1.9.3
 	github.com/spf13/viper v1.18.2
 	github.com/stark-sim/serializer v0.6.8
 	golang.org/x/time v0.5.0
+	gopkg.in/gomail.v2 v2.0.0-20160411212932-81ebce5c23df
 )
 
 require (
 	ariga.io/atlas v0.19.1-0.20240203083654-5948b60a8e43 // indirect
-	github.com/Godx1an/gp_ent v0.1.6 // indirect
 	github.com/agext/levenshtein v1.2.1 // indirect
 	github.com/apparentlymart/go-textseg/v13 v13.0.0 // indirect
 	github.com/bytedance/sonic v1.11.2 // indirect
@@ -88,6 +89,7 @@ require (
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20240308144416-29370a3891b7 // indirect
 	google.golang.org/grpc v1.59.0 // indirect
 	google.golang.org/protobuf v1.33.0 // indirect
+	gopkg.in/alexcesaro/quotedprintable.v3 v3.0.0-20150716171945-2caba252f4dc // indirect
 	gopkg.in/ini.v1 v1.67.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
